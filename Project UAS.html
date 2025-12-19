@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <title>Sistem Manajemen Data Mahasiswa</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+
+    <style>
+        body {
+            background: linear-gradient(135deg,#1e3a8a,#3b82f6);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .header {
+            background: linear-gradient(135deg,#fbbf24,#f59e0b);
+            padding: 20px;
+            border-radius: 15px;
+            font-weight: bold;
+            text-align:center;
+        }
+        .card { border-radius: 15px; }
+        .badge-yellow { background:#fbbf24; color:#000; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+
+    <div class="header mb-4 text-dark">
+        <h2><i class="fas fa-graduation-cap"></i> Sistem Manajemen Data Mahasiswa</h2>
+    </div>
+
+    <!-- STATISTIK -->
+    <div class="row mb-4">
+        <div class="col-md-4"><div class="alert alert-light text-center"><h3 id="totalMahasiswa">0</h3>Total Mahasiswa</div></div>
+        <div class="col-md-4"><div class="alert alert-light text-center"><h3 id="avgIPK">0.00</h3>Rata-rata IPK</div></div>
+        <div class="col-md-4"><div class="alert alert-light text-center"><h3 id="totalProdi">0</h3>Total Prodi</div></div>
+    </div>
+
+    <div class="row">
+
+        <!-- FORM -->
+        <div class="col-md-4">
+            <div class="card p-3">
+                <h5 id="formTitle">Tambah Mahasiswa</h5>
+                <form id="mahasiswaForm">
+                    <input type="hidden" id="editIndex" value="-1">
+
+                    <input class="form-control mb-2" id="nim" placeholder="NIM (12 digit)" required>
+                    <input class="form-control mb-2" id="nama" placeholder="Nama" required>
+                    <input class="form-control mb-2" id="umur" type="number" placeholder="Umur" required>
+                    <input class="form-control mb-2" id="prodi" placeholder="Program Studi" required>
+                    <input class="form-control mb-2" id="ipk" type="number" step="0.01" placeholder="IPK (0.00 - 4.00)" required>
+
+                    <button class="btn btn-primary w-100" type="submit"><span id="btnSubmitText">Tambah</span></button>
+                    <button type="button" id="btnCancel" onclick="resetForm()" class="btn btn-secondary w-100 mt-2" style="display:none">Batal</button>
+                </form>
+            </div>
+
+            <!-- FILE I/O -->
+            <div class="card p-3 mt-3">
+                <h6>File I/O</h6>
+                <button class="btn btn-success w-100 mb-2" onclick="exportFile()">Export Data (JSON)</button>
+                <input type="file" class="form-control" onchange="importFile(event)">
+            </div>
+        </div>
+
+        <!-- TABEL & SEARCH -->
+        <div class="col-md-8">
+            <div class="card p-3">
+
+                <!-- SEARCH BAR -->
+                <div class="row mb-3">
+                    <div class="col-md-4">
+                        <input type="text" id="searchKey" class="form-control" placeholder="Masukkan kata kunci">
+                    </div>
+                    <div class="col-md-4">
+                        <select id="searchMethod" class="form-select">
+                            <option value="linear">Linear Search (Nama)</option>
+                            <option value="binary">Binary Search (NIM)</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <button class="btn btn-primary w-100" onclick="doSearch()">Cari</button>
+                    </div>
+                </div>
+
+                <!-- SORT -->
+                <div class="mb-2 text-end">
+                    <select class="form-select w-50 d-inline" onchange="sortData(this.value)">
+                        <option value="">Urutkan Data</option>
+                        <option value="bubble">Bubble Sort (NIM)</option>
+                        <option value="insertion">Insertion Sort (Nama)</option>
+                    </select>
+                </div>
+
+                <table class="table table-bordered">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>No</th>
+                            <th>NIM</th>
+                            <th>Nama</th>
+                            <th>Umur</th>
+                            <th>Prodi</th>
+                            <th>IPK</th>
+                            <th>Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tableBody"></tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<script>
+let mahasiswaData = [];
+
+/* ================= FILE I/O ================= */
+function exportFile(){
+    const blob = new Blob([JSON.stringify(mahasiswaData,null,2)],{type:'application/json'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'data_mahasiswa.json';
+    a.click();
+}
+
+function importFile(e){
+    const reader = new FileReader();
+    reader.onload = ()=>{
+        mahasiswaData = JSON.parse(reader.result);
+        saveToStorage(); renderTable(); updateStatistics();
+    };
+    reader.readAsText(e.target.files[0]);
+}
+
+/* ================= STORAGE ================= */
+function saveToStorage(){ localStorage.setItem('mahasiswaData',JSON.stringify(mahasiswaData)); }
+function loadFromStorage(){ const d=localStorage.getItem('mahasiswaData'); if(d) mahasiswaData=JSON.parse(d); }
+
+/* ================= STATISTIK ================= */
+function updateStatistics(){
+    totalMahasiswa.textContent = mahasiswaData.length;
+    avgIPK.textContent = mahasiswaData.length ? (mahasiswaData.reduce((a,b)=>a+b.ipk,0)/mahasiswaData.length).toFixed(2) : '0.00';
+    totalProdi.textContent = new Set(mahasiswaData.map(m=>m.prodi)).size;
+}
+
+/* ================= RENDER ================= */
+function renderTable(data=mahasiswaData){
+    tableBody.innerHTML='';
+    if(!data.length){ tableBody.innerHTML='<tr><td colspan="7" class="text-center">Tidak ada data</td></tr>'; return; }
+    data.forEach((m,i)=>{
+        tableBody.innerHTML+=`<tr>
+            <td>${i+1}</td><td>${m.nim}</td><td>${m.nama}</td><td>${m.umur}</td>
+            <td><span class="badge badge-yellow">${m.prodi}</span></td>
+            <td>${m.ipk.toFixed(2)}</td>
+            <td>
+                <button class="btn btn-warning btn-sm" onclick="editMahasiswa(${i})">Edit</button>
+                <button class="btn btn-danger btn-sm" onclick="deleteMahasiswa(${i})">Hapus</button>
+            </td></tr>`;
+    });
+}
+
+/* ================= VALIDASI REGEX ================= */
+function validateInput(nim,nama,ipk){
+    if(!/^\d{12}$/.test(nim)) return alert('NIM harus 12 digit'),false;
+    if(!/^[A-Za-z\s]{3,}$/.test(nama)) return alert('Nama minimal 3 huruf'),false;
+    if(!/^(?:[0-3](?:\.\d{1,2})?|4(?:\.00?)?)$/.test(ipk)) return alert('IPK tidak valid'),false;
+    return true;
+}
+
+/* ================= TAMBAH & EDIT ================= */
+mahasiswaForm.addEventListener('submit',e=>{
+    e.preventDefault();
+    const data={nim:nim.value,nama:nama.value,umur:+umur.value,prodi:prodi.value,ipk:+ipk.value};
+    if(!validateInput(data.nim,data.nama,data.ipk)) return;
+    editIndex.value==-1 ? mahasiswaData.push(data) : mahasiswaData[editIndex.value]=data;
+    saveToStorage(); renderTable(); updateStatistics(); resetForm();
+});
+
+function editMahasiswa(i){ Object.assign(window, mahasiswaData[i]); editIndex.value=i; formTitle.textContent='Edit Data'; btnSubmitText.textContent='Update'; btnCancel.style.display='block'; }
+function deleteMahasiswa(i){ if(confirm('Yakin hapus?')){ mahasiswaData.splice(i,1); saveToStorage(); renderTable(); updateStatistics(); }}
+function resetForm(){ mahasiswaForm.reset(); editIndex.value=-1; formTitle.textContent='Tambah Mahasiswa'; btnSubmitText.textContent='Tambah'; btnCancel.style.display='none'; }
+
+/* ================= SORTING ================= */
+function sortData(type){
+    if(type==='bubble'){
+        for(let i=0;i<mahasiswaData.length;i++){
+            for(let j=0;j<mahasiswaData.length-i-1;j++){
+                if(mahasiswaData[j].nim>mahasiswaData[j+1].nim)
+                    [mahasiswaData[j],mahasiswaData[j+1]]=[mahasiswaData[j+1],mahasiswaData[j]];
+            }
+        }
+    }
+    if(type==='insertion'){
+        for(let i=1;i<mahasiswaData.length;i++){
+            let key=mahasiswaData[i],j=i-1;
+            while(j>=0 && mahasiswaData[j].nama>key.nama){ mahasiswaData[j+1]=mahasiswaData[j]; j--; }
+            mahasiswaData[j+1]=key;
+        }
+    }
+    renderTable();
+}
+
+/* ================= SEARCH ================= */
+function linearSearchNama(key){ return mahasiswaData.filter(m=>new RegExp(key,'i').test(m.nama)); }
+function binarySearchNIM(key){ sortData('bubble'); let l=0,r=mahasiswaData.length-1; while(l<=r){ let m=Math.floor((l+r)/2); if(mahasiswaData[m].nim===key) return [mahasiswaData[m]]; if(mahasiswaData[m].nim<key) l=m+1; else r=m-1; } return []; }
+
+function doSearch(){
+    const key=searchKey.value.trim();
+    if(!key) return renderTable();
+    if(searchMethod.value==='linear'){
+        if(!/^[A-Za-z\s]+$/.test(key)) return alert('Linear Search hanya untuk NAMA');
+        renderTable(linearSearchNama(key));
+    } else {
+        if(!/^\d{12}$/.test(key)) return alert('Binary Search hanya untuk NIM');
+        renderTable(binarySearchNIM(key));
+    }
+}
+
+/* ================= LOAD ================= */
+loadFromStorage(); renderTable(); updateStatistics();
+</script>
+</body>
+</html>
